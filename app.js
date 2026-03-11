@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
     const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
+    const gasUrlInput = document.getElementById('gasUrl');
+    const staffNameInput = document.getElementById('staffName');
 
     // Default Signature
     const defaultSignature = `--------------------------------
@@ -42,7 +44,9 @@ Email: [メールアドレス]
     let config = {
         apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
-        signature: localStorage.getItem('geminiSignature') || defaultSignature
+        signature: localStorage.getItem('geminiSignature') || defaultSignature,
+        gasUrl: localStorage.getItem('gasUrl') || '',
+        staffName: localStorage.getItem('staffName') || ''
     };
 
     // Initialize
@@ -51,6 +55,8 @@ Email: [メールアドレス]
     }
     apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
+    gasUrlInput.value = config.gasUrl;
+    staffNameInput.value = config.staffName;
 
     // --- Settings Modal Logic ---
     function openSettings() {
@@ -73,9 +79,13 @@ Email: [メールアドレス]
         if (val) {
             config.apiKey = val;
             config.signature = sig || defaultSignature;
+            config.gasUrl = gasUrlInput.value.trim();
+            config.staffName = staffNameInput.value.trim();
 
             localStorage.setItem('geminiApiKey', val);
             localStorage.setItem('geminiSignature', config.signature);
+            localStorage.setItem('gasUrl', config.gasUrl);
+            localStorage.setItem('staffName', config.staffName);
 
             showToast('設定を保存しました');
             closeSettings();
@@ -145,12 +155,18 @@ Email: [メールアドレス]
     }
 
     // --- Usage Logging ---
-    async function logUsage(feature, category, tone, hasInstructions) {
+    async function logUsage(logData) {
+        if (!config.gasUrl) return;
         try {
-            await fetch('/api/log', {
+            await fetch(config.gasUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ feature, category, tone, hasInstructions })
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                    timestamp: new Date().toLocaleString('ja-JP'),
+                    staffName: config.staffName,
+                    ...logData
+                })
             });
         } catch (error) {
             console.error('Failed to send usage log', error);
@@ -304,7 +320,15 @@ Email: [メールアドレス]
             resultContent.classList.remove('hidden');
 
             // Send Usage Log
-            logUsage('返信作成', category, tone, !!additional);
+            logUsage({
+                feature: '返信作成',
+                category: category,
+                tone: tone,
+                inputContent: processedEmail,
+                additionalInstruction: additional,
+                generatedSubject: resSubject.textContent,
+                generatedBody: resBody.textContent
+            });
 
             showToast('返信文を生成しました');
 
