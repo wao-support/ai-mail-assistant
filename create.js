@@ -34,12 +34,9 @@ https://www.wao-cart.com/
 Email: [メールアドレス]
 --------------------------------`;
 
-    // Default API Key (Optional)
-    const DEFAULT_API_KEY = "AIzaSyCSPxkDeNrnMhTRmwQ2D8msqkXVvQfGAYI"; // ★管理者のAPIキーをここに直書きすると、全ユーザーのデフォルトキーとして適用されます（デプロイ環境用）
-
     // Config (Shared with app.js via localStorage)
     let config = {
-        apiKey: localStorage.getItem('geminiApiKey') || DEFAULT_API_KEY,
+        apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultSignature
     };
