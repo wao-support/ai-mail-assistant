@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メール返信アシスタント</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-regular fa-envelope"></i>
+                <h1>AIメールアシスタント</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-link active"><i class="fa-solid fa-reply"></i> 汎用返信</a>
+                <a href="create.html" class="nav-link"><i class="fa-solid fa-pen"></i> 汎用新規</a>
+                <a href="obento_cs.html" class="nav-link"><i class="fa-solid fa-headset"></i> CS専用</a>
+            </nav>
+            <button id="settingsBtn" class="icon-btn" title="API設定">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Pane: Input -->
+            <div class="panel input-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-pen-to-square"></i> 入力情報</h2>
+                </div>
+                <div class="panel-body">
+                    <!-- 1. 受信メール本文 -->
+                    <div class="form-group">
+                        <label for="emailBody">① 受信メール本文 <span class="required badge">必須</span></label>
+                        <textarea id="emailBody" placeholder="受信したメールを貼り付けてください..." rows="10"></textarea>
+                    </div>
+
+                    <div class="actions center-actions">
+                        <button id="autoCategorizeBtn" class="secondary-btn">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> カテゴリを自動判定
+                        </button>
+                    </div>
+
+                    <!-- 2. カテゴリ -->
+                    <div class="form-group">
+                        <label for="categorySelect">② 問い合わせカテゴリ</label>
+                        <select id="categorySelect">
+                            <option value="" disabled selected>カテゴリを選択するか、自動判定を実行してください</option>
+                            <option value="お弁当デリ／営業">お弁当デリ／営業</option>
+                            <option value="お弁当デリ／注文">お弁当デリ／注文</option>
+                            <option value="お弁当デリ／問い合わせ">お弁当デリ／問い合わせ</option>
+                            <option value="お弁当デリ／配送">お弁当デリ／配送</option>
+                            <option value="お弁当デリ／加盟店">お弁当デリ／加盟店</option>
+                            <option value="社食DELi／営業">社食DELi／営業</option>
+                            <option value="社食DELi／スタッフ">社食DELi／スタッフ</option>
+                            <option value="社食DELi／取引先">社食DELi／取引先</option>
+                            <option value="採用">採用</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. 返信トーン -->
+                    <div class="form-group">
+                        <label for="toneSelect">③ 返信トーン <span class="required badge">必須</span></label>
+                        <select id="toneSelect">
+                            <option value="丁寧">丁寧（標準）</option>
+                            <option value="簡潔・端的" selected>簡潔・端的</option>
+                            <option value="柔らかめ・親しみやすい">柔らかめ・親しみやすい</option>
+                            <option value="謝罪・お詫び">謝罪・お詫び</option>
+                            <option value="感謝・お礼">感謝・お礼</option>
+                            <option value="催促・リマインド">催促・リマインド</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. 追加指示 -->
+                    <div class="form-group">
+                        <label for="additionalInstruction">④ 追加指示 <span class="optional badge">任意</span></label>
+                        <textarea id="additionalInstruction" placeholder="例：謝罪を入れる、電話案内をする、必要情報を質問する、など"
+                            rows="3"></textarea>
+                    </div>
+
+                    <div class="actions main-actions">
+                        <button id="generateBtn" class="primary-btn">
+                            <i class="fa-solid fa-paper-plane"></i> 返信文を生成
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Pane: Output -->
+            <div class="panel output-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-square-poll-horizontal"></i> 生成結果</h2>
+                </div>
+                <div class="panel-body" id="outputBody">
+
+                    <div class="empty-state" id="emptyState">
+                        <i class="fa-regular fa-comment-dots"></i>
+                        <p>左側のフォームに入力し、「返信文を生成」をクリックしてください。</p>
+                    </div>
+
+                    <div class="result-content hidden" id="resultContent">
+                        <!-- カテゴリ判定結果 -->
+                        <div class="result-section categorize-result">
+                            <h3><i class="fa-solid fa-tag"></i> 判定カテゴリ</h3>
+                            <div class="category-info">
+                                <span class="category-badge" id="resCategory">注文変更</span>
+                                <span class="confidence-badge high" id="resConfidence">確信度: 高</span>
+                            </div>
+                            <p class="category-reason" id="resReason">お客様からの時間変更の要望が含まれているため。</p>
+                        </div>
+
+                        <!-- 返信メール -->
+                        <div class="result-section email-result">
+                            <div class="email-result-header">
+                                <h3><i class="fa-solid fa-envelope-open-text"></i> 返信メール案</h3>
+                                <button id="copyBtn" class="copy-btn">
+                                    <i class="fa-regular fa-copy"></i> コピー
+                                </button>
+                            </div>
+                            <div class="email-preview">
+                                <div class="email-subject-line">
+                                    <strong>件名：</strong> <span id="resSubject"></span>
+                                </div>
+                                <div class="email-body-content" id="resBody">
+                                    <!-- メール本文がここに挿入されます -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading Overlay -->
+                    <div class="loading-overlay hidden" id="loadingOverlay">
+                        <div class="spinner"></div>
+                        <p id="loadingText">生成中...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- API Settings Modal -->
+    <div class="modal-backdrop hidden" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-key"></i> API設定</h2>
+                <button class="close-btn" id="closeSettingsBtn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="setup-desc">Google Gemini APIのキーを入力してください。キーはお使いのブラウザにのみ保存されます。</p>
+                <div class="form-group">
+                    <label for="apiKey">Gemini API Key</label>
+                    <input type="password" id="apiKey" placeholder="AIzaSy...">
+                </div>
+                <div class="form-group">
+                    <label for="signatureText">メール末尾の署名</label>
+                    <textarea id="signatureText"
+                        placeholder="例：&#10;--------------------------------&#10;ワオ株式会社&#10;https://www.wao-cart.com/&#10;&#10;担当：[あなたのお名前]&#10;Email: [あなたのメールアドレス]&#10;--------------------------------"
+                        rows="6"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button id="feedbackBtn" class="secondary-btn"
+                    style="border: none; background: transparent; color: var(--text-muted); font-size: 0.85rem;">
+                    <i class="fa-solid fa-comment-dots"></i> フィードバックを送る
+                </button>
+                <button id="saveSettingsBtn" class="primary-btn" style="width: auto;">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast hidden" id="toast"></div>
+
+    <!-- Feedback Button removed from here -->
+
+    <!-- Feedback Modal -->
+    <div class="modal-backdrop hidden" id="feedbackModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-comment-dots"></i> テストへのご意見・ご感想</h2>
+                <button class="close-btn" id="closeFeedbackBtn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="setup-desc">このツールを使ってみた感想や、「こんな機能が欲しい」といったご要望をお気軽にお寄せください。</p>
+                <div class="form-group">
+                    <label for="feedbackName">お名前（任意）</label>
+                    <input type="text" id="feedbackName" placeholder="例：ワオ太郎">
+                </div>
+                <div class="form-group">
+                    <label for="feedbackMessage">ご意見・ご感想 <span class="required badge">必須</span></label>
+                    <textarea id="feedbackMessage" rows="5" placeholder="例：いつも作る〇〇の案内メールを手軽に作れるようにしてほしいです。"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="sendFeedbackBtn" class="primary-btn"><i class="fa-solid fa-paper-plane"></i> 送信する</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="feedback.js"></script>
+</body>
+
+</html>

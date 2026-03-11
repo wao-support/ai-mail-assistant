@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <title>AIメールアシスタント 利用マニュアル</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Yu Gothic', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #e65100;
+      border-bottom: 2px solid #e65100;
+      padding-bottom: 10px;
+    }
+
+    h2 {
+      color: #333;
+      background: #fff3e0;
+      padding: 10px;
+      border-left: 5px solid #ff9800;
+      margin-top: 30px;
+    }
+
+    h3 {
+      color: #555;
+      margin-top: 20px;
+    }
+
+    p {
+      margin-bottom: 15px;
+    }
+
+    ul,
+    ol {
+      margin-bottom: 20px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .note {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 30px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e65100;
+      color: white;
+      border-radius: 12px;
+      font-size: 0.8em;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>AIメールアシスタント 利用マニュアル</h1>
+  <p>本システムは、日々のメール対応業務を効率化するためのAI（Gemini API）を活用したメール作成補助ツールです。<br>
+    用途に合わせて以下の3つの機能が用意されています。</p>
+
+  <h2>1. 汎用返信</h2>
+  <p><strong>【目的】</strong><br>
+    受信したメールに対する返信文を、ビジネスの場面にふさわしい適切な敬語やマナーに従って自動作成します。</p>
+  <p><strong>【使い方】</strong></p>
+  <ol>
+    <li><strong>① 受信メール本文</strong>: 返信したいメールの本文をコピーして貼り付けます。</li>
+    <li><strong>自動判定</strong>: 「カテゴリを自動判定」ボタンを押すと、AIが内容を分析して自動でカテゴリを選択します（手動で選択することも可能です）。</li>
+    <li><strong>③ 返信トーン</strong>: 丁寧、簡潔・端的、謝罪など、状況に合ったトーン（文体）を選びます。</li>
+    <li><strong>④ 追加指示（任意）</strong>: 「〇〇について追加で質問してほしい」「明日の14時で調整をお願いする」といった具体的な指示があれば入力します。</li>
+    <li><strong>「返信文を生成」をクリック</strong>: 画面右側に件名と本文の案が出力されます。</li>
+    <li><strong>コピーして利用</strong>: 「コピー」ボタンをクリックするとクリップボードに保存されるので、お使いのメールソフトにそのまま貼り付けて送信できます。</li>
+  </ol>
+
+  <h2>2. 汎用新規</h2>
+  <p><strong>【目的】</strong><br>
+    受信メールに対する返信ではなく、ゼロから新しく案内や依頼などのビジネスメールを作成する際に使用します。</p>
+  <p><strong>【使い方】</strong></p>
+  <ol>
+    <li><strong>① 宛名（会社名等） / ② 宛名（お名前）</strong>: 送信先の会社名や担当者名を入力します（入力するとメールの冒頭に自動で挿入されます）。</li>
+    <li><strong>③ 伝えたい内容</strong>: メインの用件を箇条書きや短い文章で入力します。（例：「明日の会議を14時に変更してほしい」など）</li>
+    <li><strong>④ 返信トーン</strong>: 用途に応じた返信トーンを選択します。</li>
+    <li><strong>「メールを生成」をクリック</strong>: 画面右側に宛名、挨拶、指定した用件の丁寧な展開、結び、署名がすべて揃ったメール案が作成されます。</li>
+    <li><strong>コピーして利用</strong>: 「コピー」ボタンを押してメールソフトで利用します。</li>
+  </ol>
+
+  <h2>3. CS専用（お弁当デリ カスタマーサポート専用）</h2>
+  <p><strong>【目的】</strong><br>
+    お弁当デリのカスタマーサポート業務に特化し、FAQや過去の対応ログを参照して、より専門的で正確な返信文を生成します。</p>
+  <p><strong>【使い方】</strong></p>
+  <ol>
+    <li><strong>① 受信メール本文</strong>: お客様からの受信メールを貼り付けます。</li>
+    <li><strong>② お客様の宛名情報</strong>: 会社名やお名前を入力します。</li>
+    <li><strong>③ 対応方針・具体的な案内内容</strong>: お客様のご要望に対して「確認」「了解」「拒否」などのスタンスを選び、具体的な案内事項があれば入力します。</li>
+    <li><strong>④ 参照データ</strong>: より正確な回答を作るため、「FAQを参照する」「過去の類似対応ログを参照する」にチェックを入れることができます。</li>
+    <li><strong>⑤ 返信トーン</strong>: 目的に合ったトーンを選びます。</li>
+    <li><strong>「CS向け返信文を生成」をクリック</strong>: 自動で問い合わせカテゴリ（注文変更、配送遅延など）が判定され、コールセンター基準のクッション言葉などを用いたメール案が出力されます。</li>
+  </ol>
+
+  <div class="note">
+    <h3>【共通機能】設定画面（右上の歯車アイコン）</h3>
+    <p>全機能のベースとなる以下の設定を行えます。設定アイコンをクリックして確認してください。</p>
+    <ul>
+      <li><strong>Gemini API Keyの設定</strong>: システムを利用するためのAPIキーを入力・保存します。</li>
+      <li><strong>メール末尾の署名</strong>: 生成されるすべてのメールの末尾に自動で挿入される署名を変更・保存できます。部署名やご自身の名前に書き換えてご利用いただけます。</li>
+    </ul>
+  </div>
+</body>
+
+</html>
