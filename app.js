@@ -158,15 +158,16 @@ Email: [メールアドレス]
     async function logUsage(logData) {
         if (!config.gasUrl) return;
         try {
+            const payload = JSON.stringify({
+                timestamp: new Date().toLocaleString('ja-JP'),
+                staffName: config.staffName,
+                ...logData
+            });
+            const params = new URLSearchParams({ data: payload });
             await fetch(config.gasUrl, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    timestamp: new Date().toLocaleString('ja-JP'),
-                    staffName: config.staffName,
-                    ...logData
-                })
+                body: params
             });
         } catch (error) {
             console.error('Failed to send usage log', error);

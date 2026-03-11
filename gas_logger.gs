@@ -38,11 +38,44 @@ function getOrCreateSheet() {
   return sheet;
 }
 
+function doGet(e) {
+  try {
+    // GETパラメータ経由でもログ記録できるようにする
+    if (e.parameter && e.parameter.data) {
+      const data = JSON.parse(e.parameter.data);
+      const sheet = getOrCreateSheet();
+      sheet.appendRow([
+        data.timestamp || new Date().toLocaleString('ja-JP'),
+        data.staffName || '',
+        data.feature || '',
+        data.category || '',
+        data.tone || '',
+        data.inputContent || '',
+        data.additionalInstruction || '',
+        data.generatedSubject || '',
+        data.generatedBody || ''
+      ]);
+      return ContentService.createTextOutput('ok');
+    }
+    return ContentService.createTextOutput('ok');
+  } catch (err) {
+    return ContentService.createTextOutput('error: ' + err.toString());
+  }
+}
+
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
-    const sheet = getOrCreateSheet();
+    // フォームデータ形式（URLSearchParams）で受信
+    let data;
+    if (e.parameter && e.parameter.data) {
+      data = JSON.parse(e.parameter.data);
+    } else if (e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+    } else {
+      throw new Error('No data received');
+    }
 
+    const sheet = getOrCreateSheet();
     sheet.appendRow([
       data.timestamp || new Date().toLocaleString('ja-JP'),
       data.staffName || '',
