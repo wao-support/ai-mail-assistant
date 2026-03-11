@@ -41,7 +41,7 @@ Email: [メールアドレス]
         apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultSignature,
-        gasUrl: localStorage.getItem('gasUrl') || '',
+        gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
         staffName: localStorage.getItem('staffName') || ''
     };
 
