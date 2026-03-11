@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
     const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
-    const gasUrlInput = document.getElementById('gasUrl');
     const staffNameInput = document.getElementById('staffName');
 
     // Default Signature
@@ -55,7 +54,6 @@ Email: [メールアドレス]
     }
     apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
-    gasUrlInput.value = config.gasUrl;
     staffNameInput.value = config.staffName;
 
     // --- Settings Modal Logic ---
@@ -79,12 +77,10 @@ Email: [メールアドレス]
         if (val) {
             config.apiKey = val;
             config.signature = sig || defaultSignature;
-            config.gasUrl = gasUrlInput.value.trim();
             config.staffName = staffNameInput.value.trim();
 
             localStorage.setItem('geminiApiKey', val);
             localStorage.setItem('geminiSignature', config.signature);
-            localStorage.setItem('gasUrl', config.gasUrl);
             localStorage.setItem('staffName', config.staffName);
 
             showToast('設定を保存しました');
