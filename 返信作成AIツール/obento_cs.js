@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
     const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
+    const gasUrlInput = document.getElementById('gasUrl');
+    const staffNameInput = document.getElementById('staffName');
 
     // Default CS Signature
     const defaultCsSignature = `--------------------------------
@@ -77,7 +79,9 @@ Email: support@obentodeli.jp
     let config = {
         apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
-        signature: localStorage.getItem('geminiSignature') || defaultCsSignature
+        signature: localStorage.getItem('geminiSignature') || defaultCsSignature,
+        gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
+        staffName: localStorage.getItem('staffName') || ''
     };
 
     // Initialize
@@ -86,6 +90,8 @@ Email: support@obentodeli.jp
     }
     apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
+    gasUrlInput.value = config.gasUrl;
+    staffNameInput.value = config.staffName;
 
     // --- Settings Modal Logic ---
     function openSettings() { settingsModal.classList.remove('hidden'); }
@@ -100,8 +106,12 @@ Email: support@obentodeli.jp
         if (val) {
             config.apiKey = val;
             config.signature = sig || defaultCsSignature;
+            config.gasUrl = gasUrlInput.value.trim();
+            config.staffName = staffNameInput.value.trim();
             localStorage.setItem('geminiApiKey', val);
             localStorage.setItem('geminiSignature', config.signature);
+            localStorage.setItem('gasUrl', config.gasUrl);
+            localStorage.setItem('staffName', config.staffName);
             showToast('設定を保存しました');
             closeSettings();
         } else {
@@ -154,12 +164,19 @@ Email: support@obentodeli.jp
     }
 
     // --- Usage Logging ---
-    async function logUsage(feature, category, tone, hasInstructions) {
+    async function logUsage(logData) {
+        if (!config.gasUrl) return;
         try {
-            await fetch('/api/log', {
+            const payload = JSON.stringify({
+                timestamp: new Date().toLocaleString('ja-JP'),
+                staffName: config.staffName,
+                ...logData
+            });
+            const params = new URLSearchParams({ data: payload });
+            await fetch(config.gasUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ feature, category, tone, hasInstructions })
+                mode: 'no-cors',
+                body: params
             });
         } catch (error) {
             console.error('Failed to send usage log', error);
@@ -285,7 +302,15 @@ ${config.signature}
             resultContent.classList.remove('hidden');
 
             // Send Usage Log
-            logUsage('お弁当デリCS返信', category, tone, !!(selectedPolicyType || policyDetail));
+            logUsage({
+                feature: 'CS返信（お弁当デリ）',
+                category: category,
+                tone: tone,
+                inputContent: processedEmail,
+                additionalInstruction: [selectedPolicyType, policyDetail].filter(Boolean).join(' / '),
+                generatedSubject: resSubjectEl.textContent,
+                generatedBody: resBodyEl.innerText
+            });
 
             showToast('CS用返信文を生成しました');
             document.querySelector('.output-panel .panel-body').scrollTop = 0;
