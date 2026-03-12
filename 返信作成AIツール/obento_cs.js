@@ -159,6 +159,56 @@ Email: support@obentodeli.jp
         return data.candidates[0].content.parts[0].text;
     }
 
+    // --- Gemini API Call (Streaming) ---
+    async function streamGeminiApi(prompt, onToken) {
+        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3 }
+        };
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const errBody = await response.json();
+            throw new Error(errBody.error?.message || `API Error ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // keep incomplete line
+
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const dataStr = line.replace("data: ", "").trim();
+                    if (!dataStr) continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (textPart) {
+                            onToken(textPart);
+                        }
+                    } catch (e) {
+                        console.error("SSE parse error", e, dataStr);
+                    }
+                }
+            }
+        }
+    }
+
     // --- Usage Logging ---
     async function logUsage(logData) {
         if (!config.gasUrl) return;
@@ -261,13 +311,61 @@ ${config.signature}
 
             prompt += `\n### お客様からの受信メール\n## ${processedEmail}`;
 
-            // Call API
-            const resultText = await callGeminiApi(prompt);
+            // Provide immediate UI feedback for streaming
+            loadingOverlay.classList.add('hidden');
+            resultContent.classList.remove('hidden');
+            resSubjectEl.textContent = "考え中...";
+            resBodyEl.innerHTML = "";
 
-            // Parse result
-            let category = "その他（自動判定失敗）";
+            // Wait, for obento_cs.js we need Category, Subject and Body.
+            // Since it streams, we can display Category and Policy info immediately via a placeholder.
+            let policyText = "-";
+            if (selectedPolicyType) policyText = selectedPolicyType;
+            if (policyDetail) policyText += ` (${policyDetail})`;
+            resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>（生成中...）</strong>`;
+            resFaqUsedEl.textContent = useFaq ? "使用した" : "使用していない";
+            resLogUsedEl.textContent = usePastLog ? "使用した" : "使用していない";
+
+            // Call Streaming API
+            let resultBuffer = "";
+            let finalCategory = "その他（自動判定失敗）";
+
+            await streamGeminiApi(prompt, (text) => {
+                resultBuffer += text;
+
+                // Extract Category dynamically while streaming
+                const categoryMatch = resultBuffer.match(/【判定カテゴリ】[：:]\s*([^\n]*)/);
+                if (categoryMatch) {
+                    finalCategory = categoryMatch[1].trim();
+                }
+                resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>${finalCategory || '（生成中...）'}</strong>`;
+
+                // Extract Subject dynamically while streaming
+                const subjectMatch = resultBuffer.match(/【件名案】[：:]\s*([^\n]*)/);
+                if (subjectMatch) {
+                    resSubjectEl.textContent = subjectMatch[1].trim();
+                }
+
+                // Extract Body dynamically while streaming
+                const bodySplit = resultBuffer.split(/【本文】[：:]\s*\n?/);
+                if (bodySplit.length > 1) {
+                    const bodyContent = bodySplit.slice(1).join("【本文】：").trimStart();
+                    resBodyEl.innerHTML = formatBodyText(bodyContent);
+                } else {
+                    // Until body formally starts, we can optionally show everything for debugging,
+                    // but since CS has category tags, we'll just show the buffer directly for now.
+                    resBodyEl.innerHTML = formatBodyText(resultBuffer);
+                }
+
+                // Keep scrolled to bottom
+                const panelBody = document.querySelector('.output-panel .panel-body');
+                panelBody.scrollTop = panelBody.scrollHeight;
+            });
+
+            // Final safety parsing
+            let category = finalCategory;
             let subject = "Re: お問い合わせにつきまして";
-            let body = resultText;
+            let body = resultBuffer;
 
             const categoryMatch = resultText.match(/【判定カテゴリ】[：:]\s*(.*?)\n/);
             if (categoryMatch) category = categoryMatch[1].trim();
@@ -275,27 +373,19 @@ ${config.signature}
             const subjectMatch = resultText.match(/【件名案】[：:]\s*(.*?)\n/);
             if (subjectMatch) subject = subjectMatch[1].trim();
 
-            const bodyMatch = resultText.split(/【本文】[：:]\s*\n?/);
-            if (bodyMatch.length > 1) {
-                body = bodyMatch.slice(1).join("【本文】：").trim();
+            let bodySplitFinal = resultBuffer.split(/【本文】[：:]\s*\n?/);
+            if (bodySplitFinal.length > 1) {
+                body = bodySplitFinal.slice(1).join("【本文】：").trim();
             } else {
-                body = resultText.replace(/【判定カテゴリ】.*?\n/g, '').replace(/【件名案】.*?\n/g, '').trim();
+                body = resultBuffer.replace(/【判定カテゴリ】.*?\n/g, '').replace(/【件名案】.*?\n/g, '').trim();
             }
 
             // Set UI
             resSubjectEl.textContent = subject;
             resBodyEl.innerHTML = formatBodyText(body);
 
-            // Set Info display
-            let policyText = "-";
-            if (selectedPolicyType) policyText = selectedPolicyType;
-            if (policyDetail) policyText += ` (${policyDetail})`;
+            // Set Info display final state with actual category
             resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>${category}</strong>`;
-            resFaqUsedEl.textContent = useFaq ? "使用した" : "使用していない";
-            resLogUsedEl.textContent = usePastLog ? "使用した" : "使用していない";
-
-            loadingOverlay.classList.add('hidden');
-            resultContent.classList.remove('hidden');
 
             // Send Usage Log
             logUsage({

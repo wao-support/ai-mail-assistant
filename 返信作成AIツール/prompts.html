@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロンプト置き場 - AIメールアシスタント</title>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-regular fa-envelope"></i>
+                <h1>AIメールアシスタント君</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-link"><i class="fa-solid fa-reply"></i> 汎用返信</a>
+                <a href="create.html" class="nav-link"><i class="fa-solid fa-pen"></i> 汎用新規</a>
+                <a href="obento_cs.html" class="nav-link"><i class="fa-solid fa-headset"></i> CS専用</a>
+                <a href="prompts.html" class="nav-link active"><i class="fa-solid fa-book-bookmark"></i> プロンプト置き場</a>
+            </nav>
+            <button id="settingsBtn" class="icon-btn" title="API設定">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main-content" style="display: block;">
+            <header class="page-header">
+                <div class="header-left">
+                    <h2><i class="fa-solid fa-book-bookmark"></i> 社内プロンプト共有ライブラリ</h2>
+                    <p class="subtitle">よく使う指示をテンプレートとして共有し、全員でクオリティを統一しましょう。</p>
+                </div>
+                <!-- 投稿ボタン -->
+                <button id="showPostFormBtn" class="btn btn-primary">
+                    <i class="fa-solid fa-plus"></i> 新規プロンプトを投稿
+                </button>
+            </header>
+
+            <div class="content-body" style="overflow-y: auto;">
+                <!-- 新規投稿フォーム (初期状態は非表示) -->
+                <div id="postFormContainer" class="card post-form-card" style="display: none; margin-bottom: 2rem;">
+                    <h3>新しいプロンプトを共有する</h3>
+                    <form id="promptPostForm">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2;">
+                                <label for="postTitle">タイトル（用途） <span class="required">*</span></label>
+                                <input type="text" id="postTitle" placeholder="例: クレームへの一次回答用テンプレート" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="postDepartment">事業部別</label>
+                                <select id="postDepartment">
+                                    <option value="全社">全社</option>
+                                    <option value="社食DELi／営業">社食DELi／営業</option>
+                                    <option value="社食DELi／運営">社食DELi／運営</option>
+                                    <option value="お弁当デリ／営業">お弁当デリ／営業</option>
+                                    <option value="お弁当デリ／運営">お弁当デリ／運営</option>
+                                    <option value="屋台DELi">屋台DELi</option>
+                                    <option value="その他">その他</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="postCategory">カテゴリ</label>
+                                <select id="postCategory">
+                                    <option value="文書作成">文書作成</option>
+                                    <option value="議事録作成">議事録作成</option>
+                                    <option value="資料作成・その他">資料作成・その他</option>
+                                    <option value="その他">その他</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="postAuthor">投稿者名（任意）</label>
+                            <input type="text" id="postAuthor" placeholder="例: CSチーム 鈴木">
+                        </div>
+                        <div class="form-group">
+                            <label for="postContent">プロンプト本文 <span class="required">*</span></label>
+                            <textarea id="postContent"
+                                placeholder="指示や条件、出力フォーマットなどを入力してください。必要に応じて【】等で変数にする部分を明記すると使いやすいです。" rows="6"
+                                required></textarea>
+                            <div class="help-text">
+                                ※個人情報や顧客の機密情報は含めないでください。
+                            </div>
+                        </div>
+                        <div class="form-actions" style="justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                            <button type="button" id="cancelPostBtn" class="btn btn-secondary">キャンセル</button>
+                            <button type="submit" id="submitPostBtn" class="btn btn-primary">
+                                <i class="fa-solid fa-paper-plane"></i> 共有する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- フィルターと検索バー -->
+                <div class="filter-bar" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <div class="filter-group form-group" style="margin-bottom: 0;">
+                        <select id="filterDepartment" style="width: auto;">
+                            <option value="ALL">事業部: すべて</option>
+                            <option value="全社">全社</option>
+                            <option value="社食DELi／営業">社食DELi／営業</option>
+                            <option value="社食DELi／運営">社食DELi／運営</option>
+                            <option value="お弁当デリ／営業">お弁当デリ／営業</option>
+                            <option value="お弁当デリ／運営">お弁当デリ／運営</option>
+                            <option value="屋台DELi">屋台DELi</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div class="filter-group form-group" style="margin-bottom: 0;">
+                        <select id="filterCategory" style="width: auto;">
+                            <option value="ALL">カテゴリ: すべて</option>
+                            <option value="文書作成">文書作成</option>
+                            <option value="議事録作成">議事録作成</option>
+                            <option value="資料作成・その他">資料作成・その他</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ローディング表示 -->
+                <div id="loadingIndicator" class="loading-state"
+                    style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x" style="margin-bottom: 1rem;"></i>
+                    <p>プロンプト一覧を読み込んでいます...</p>
+                </div>
+
+                <!-- エラー表示 -->
+                <div id="errorIndicator" class="error-message"
+                    style="display: none; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;">
+                    <!-- エラーメッセージがここに入ります -->
+                </div>
+
+                <!-- プロンプト一覧 (カードグリッド) -->
+                <div id="promptsGrid" class="prompts-grid">
+                    <!-- JavaScriptで動的に追加されます -->
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- プロンプト詳細モーダル -->
+    <div class="modal-backdrop" id="promptDetailModal" style="display: none;">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 id="detailPromptTitle">プロンプト詳細</h2>
+                <button class="close-btn" id="closePromptDetailBtn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <span class="badge badge-gray" id="detailPromptDept"></span>
+                    <span class="badge badge-blue" id="detailPromptCat"></span>
+                    <div style="margin-left: auto; color: var(--text-muted); font-size: 0.9rem;">
+                        <span id="detailPromptAuthor"></span> • <span id="detailPromptDate"></span>
+                    </div>
+                </div>
+                <div id="detailPromptText" class="prompt-detail-text"></div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button id="detailPromptCopyBtn" class="btn btn-secondary">
+                    <i class="fa-solid fa-copy"></i> テキストをコピー
+                </button>
+                <button id="closePromptDetailFooterBtn" class="btn btn-primary">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設定モーダル（他ページと共通） -->
+    <div class="modal-backdrop" id="settingsModal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-gear"></i> 設定</h2>
+                <button class="close-btn" id="closeSettingsBtn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="apiKeyInput">Gemini APIキー</label>
+                    <p class="setup-desc"
+                        style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                        AIからの回答を生成するために必要なキーです。取得方法は<a href="https://aistudio.google.com/app/apikey"
+                            target="_blank">Google AI Studio</a>をご確認ください。</p>
+                    <div class="input-with-button" style="display: flex; gap: 0.5rem;">
+                        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." style="flex: 1;">
+                        <button id="toggleApiKeyVisibility" class="icon-btn" title="表示/非表示">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="promptGasUrlInput">プロンプト管理用 GAS URL</label>
+                    <p class="setup-desc"
+                        style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                        プロンプト置き場のデータを読み書きするためのGoogle Apps Script WebアプリURLです。</p>
+                    <input type="url" id="promptGasUrlInput" placeholder="https://script.google.com/macros/s/...">
+                    <p class="help-text" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        ※このURLが設定されていないと機能しません。</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end;">
+                <button id="saveSettingsBtn" class="btn btn-primary">保存して閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notificationArea" class="notification-area"></div>
+
+    <script src="prompts.js"></script>
+</body>
+
+</html>

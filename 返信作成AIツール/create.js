@@ -140,6 +140,65 @@ Email: [メールアドレス]
         }
     }
 
+    // --- AI Integration (Gemini API: Streaming) ---
+    async function streamGeminiApi(prompt, onToken) {
+        if (!config.apiKey) {
+            throw new Error('APIキーが設定されていません。右上の設定アイコンから設定してください。');
+        }
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+
+        const requestBody = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3 }
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error?.message || 'APIリクエストに失敗しました');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop(); // keep incomplete line
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const dataStr = line.replace("data: ", "").trim();
+                        if (!dataStr) continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (textPart) {
+                                onToken(textPart);
+                            }
+                        } catch (e) {
+                            console.error("SSE parse error", e, dataStr);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Gemini API Streaming Error:', error);
+            throw error;
+        }
+    }
+
     // --- Usage Logging ---
     async function logUsage(logData) {
         if (!config.gasUrl) return;
@@ -173,18 +232,17 @@ Email: [メールアドレス]
             return;
         }
 
-        // Show loading
+        // Show loading header early, show result container so we can stream into it
         emptyState.classList.add('hidden');
-        resultContent.classList.add('hidden');
-        loadingOverlay.classList.remove('hidden');
-        loadingText.textContent = '新規メールを生成しています...';
+        resultContent.classList.remove('hidden');
+        loadingOverlay.classList.add('hidden');
         generateBtn.disabled = true;
+
+        resSubject.textContent = "考え中...";
+        resBody.textContent = "";
 
         try {
             await runGeneration(companyName, recipientName, mainContent, tone);
-
-            loadingOverlay.classList.add('hidden');
-            resultContent.classList.remove('hidden');
 
             // Send Usage Log
             logUsage({
@@ -254,23 +312,52 @@ ${mainContent}
 【希望するトーン】
 ${tone}`;
 
-        const resultText = await callGeminiApi(prompt);
+        let resultBuffer = "";
 
-        // Parse the result
+        await streamGeminiApi(prompt, (text) => {
+            resultBuffer += text;
+
+            const bodySplit = resultBuffer.split(/本文[：:]\s*\n?/);
+            if (bodySplit.length > 1) {
+                // Body has started
+                const subjectPart = bodySplit[0];
+                const subjectMatch = subjectPart.match(/件名案[：:]\s*([^\n]*)/);
+                if (subjectMatch) {
+                    resSubject.textContent = subjectMatch[1].trim();
+                } else {
+                    resSubject.textContent = subjectPart.replace(/件名案[：:].*?\n/, '').trim();
+                }
+                resBody.textContent = bodySplit.slice(1).join("本文：").trimStart();
+
+                // Auto-scroll to bottom of output panel while streaming
+                const panelBody = document.querySelector('.output-panel .panel-body');
+                panelBody.scrollTop = panelBody.scrollHeight;
+            } else {
+                // Still generating subject or formatting
+                const subjectMatch = resultBuffer.match(/件名案[：:]\s*([^\n]*)/);
+                if (subjectMatch) {
+                    resSubject.textContent = subjectMatch[1].trim();
+                } else {
+                    resSubject.textContent = "考え中...";
+                }
+                resBody.textContent = resultBuffer;
+            }
+        });
+
+        // Final cleanly just in case
         let subject = "メールの件名（生成に失敗しました）";
-        let body = resultText;
+        let body = resultBuffer;
 
-        const subjectMatch = resultText.match(/件名案[：:]\s*(.*?)\n/);
+        const subjectMatch = resultBuffer.match(/件名案[：:]\s*(.*?)\n/);
         if (subjectMatch) {
             subject = subjectMatch[1].trim();
         }
 
-        const bodyMatch = resultText.split(/本文[：:]\s*\n?/);
+        const bodyMatch = resultBuffer.split(/本文[：:]\s*\n?/);
         if (bodyMatch.length > 1) {
             body = bodyMatch.slice(1).join("本文：").trim();
         } else {
-            // Remove subject from output if regex split failed
-            body = resultText.replace(/件名案[：:].*?\n/, '').trim();
+            body = resultBuffer.replace(/件名案[：:].*?\n/, '').trim();
         }
 
         // Set UI
