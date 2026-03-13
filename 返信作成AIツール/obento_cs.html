@@ -104,7 +104,7 @@
 
                     <!-- 3. 対応方針と具体的な案内内容 -->
                     <div class="form-group">
-                        <label>③ 対応方針・具体的な案内内容 <span class="optional badge">任意</span></label>
+                        <label>③ 対応方針・AIに盛り込んでほしい要点 <span class="optional badge">任意</span></label>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
                             <select id="policySelect" style="width: 100%; max-width: 250px;">
                                 <option value="" selected>なし（指定しない）</option>
@@ -112,12 +112,12 @@
                                 <option value="了解">了解</option>
                                 <option value="拒否">拒否</option>
                             </select>
-                            <textarea id="policyDetail" rows="3"
-                                placeholder="（任意）具体的なご案内内容や追加の指示があれば入力してください。&#10;例(確認)：アレルギーの有無を伺う&#10;例(拒否)：期限切れのためお断り"
+                            <textarea id="policyDetail" rows="5"
+                                placeholder="必要に応じて、箇条書きで具体的に指定してください。&#10;・伝える結論：&#10;・理由や補足：&#10;・相手に求めるアクション（あれば）："
                                 style="width: 100%; resize: vertical; margin-top: 5px;"></textarea>
                         </div>
                         <p style="font-size: 0.8em; color: var(--text-muted); margin-top: 5px;">
-                            ※「確認」「了解」「拒否」のスタンスを選び、必要に応じて具体的なご案内内容や追加の指示を入力してください。</p>
+                            ※「確認」「了解」「拒否」のスタンスを選び、さらに詳細な指示を追加できます。</p>
                     </div>
 
                     <!-- 4. 参照データ -->

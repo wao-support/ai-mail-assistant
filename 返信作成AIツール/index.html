@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>メール返信アシスタント</title>
+    <title>AIメールアシスタント - 汎用返信</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,7 @@
         <header class="app-header">
             <div class="logo">
                 <i class="fa-regular fa-envelope"></i>
-                <h1>AIメールアシスタント君</h1>
+                <h1>AIメールアシスタント</h1>
             </div>
             <nav class="nav-menu">
                 <a href="index.html" class="nav-link active"><i class="fa-solid fa-reply"></i> 汎用返信</a>
@@ -88,9 +88,11 @@
 
                     <!-- 4. 追加指示 -->
                     <div class="form-group">
-                        <label for="additionalInstruction">④ 追加指示 <span class="optional badge">任意</span></label>
-                        <textarea id="additionalInstruction" placeholder="例：謝罪を入れる、電話案内をする、必要情報を質問する、など"
-                            rows="3"></textarea>
+                        <label for="additionalInstruction">④ AIに盛り込んでほしい要点 <span
+                                class="optional badge">任意</span></label>
+                        <textarea id="additionalInstruction"
+                            placeholder="箇条書きにするとAIが理解しやすくなります。&#10;・伝える結論：&#10;・理由や補足：&#10;・相手に求めるアクション："
+                            rows="5"></textarea>
                     </div>
 
                     <div class="actions main-actions">
