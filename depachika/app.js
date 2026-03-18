@@ -228,6 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if(row.price_max) maxInput.value = row.price_max;
             if(row.item_count) countInput.value = row.item_count;
 
+            // 備考フィールドの初期値
+            if(row.notes) {
+                clone.querySelector('.notes-input').value = row.notes;
+                clone.querySelector('.notes-area').classList.remove('hidden');
+                clone.querySelector('.notes-toggle-btn').textContent = '− 備考';
+            }
+
             // イベントバインド
             bindCardEvents(card, row);
 
@@ -273,6 +280,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 row[group.dataset.field] = e.target.dataset.val;
                 triggerSave(row, card);
             });
+        });
+
+        // 備考トグル
+        const notesToggleBtn = card.querySelector('.notes-toggle-btn');
+        const notesArea = card.querySelector('.notes-area');
+        notesToggleBtn.addEventListener('click', () => {
+            const isHidden = notesArea.classList.toggle('hidden');
+            notesToggleBtn.textContent = isHidden ? '＋ 備考' : '− 備考';
+            if (!isHidden) {
+                card.querySelector('.notes-input').focus();
+            }
+        });
+
+        // 備考テキストエリア
+        const notesInput = card.querySelector('.notes-input');
+        notesInput.addEventListener('input', (e) => {
+            row.notes = e.target.value;
+            triggerSave(row, card);
         });
 
         // テキスト入力の監視 (デバウンス)

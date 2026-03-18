@@ -345,6 +345,47 @@ input[type="number"]:focus {
     font-weight: 600;
 }
 
+/* 備考 */
+.notes-section {
+    margin-top: 4px;
+}
+
+.notes-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+    font-family: inherit;
+}
+
+.notes-toggle-btn:active {
+    color: var(--primary-color);
+}
+
+.notes-area {
+    margin-top: 8px;
+}
+
+.notes-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #f2f2f7;
+    color: var(--text-primary);
+    resize: vertical;
+    font-family: inherit;
+}
+
+.notes-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: #fff;
+}
+
 /* ロード表示 */
 .loading {
     text-align: center;
