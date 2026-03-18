@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingOverlay = document.getElementById('loading-overlay');
     
     const filterBtns = document.querySelectorAll('.filter-btn');
+    const brandSearch = document.getElementById('brand-search');
 
     // ==== Initialization ====
     if (!apiUrl) {
@@ -153,17 +154,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openStoreList(depName, rows) {
         currentDepartment = { name: depName, rows: rows };
-        
+
         headerTitle.textContent = depName;
         btnBack.classList.remove('hidden');
-        
+
         screenDepartment.classList.remove('active');
         screenStore.classList.add('active');
-        
-        // フィルタ初期化
+
+        // フィルタ・検索初期化
         document.querySelector('.filter-btn.active').classList.remove('active');
         document.querySelector('[data-filter="all"]').classList.add('active');
-        
+        brandSearch.value = '';
+
         renderStoreList('all');
     }
 
@@ -183,13 +185,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderStoreList(filterMode) {
         listStore.innerHTML = '';
         const tpl = document.getElementById('tpl-store-card').content;
-        
+        const searchQuery = brandSearch.value.trim().toLowerCase();
+
         currentDepartment.rows.forEach(row => {
             const completed = isRowCompleted(row);
-            
+
             // フィルタ適用
             if (filterMode === 'pending' && completed) return;
             if (filterMode === 'completed' && !completed) return;
+
+            // 検索フィルタ適用
+            if (searchQuery) {
+                const name = (row.brand_name || '').toLowerCase();
+                if (!name.includes(searchQuery)) return;
+            }
             
             const clone = document.importNode(tpl, true);
             const card = clone.querySelector('.store-card');
@@ -233,6 +242,12 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.classList.add('active');
             renderStoreList(e.target.dataset.filter);
         });
+    });
+
+    // ブランド検索
+    brandSearch.addEventListener('input', () => {
+        const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
+        renderStoreList(activeFilter);
     });
 
     function bindCardEvents(card, row) {
