@@ -1,0 +1,334 @@
+:root {
+    --bg-color: #f5f5f7;
+    --card-bg: #ffffff;
+    --text-primary: #1d1d1f;
+    --text-secondary: #86868b;
+    --primary-color: #007aff;
+    --border-color: #d2d2d7;
+    --error-color: #ff3b30;
+    --success-color: #34c759;
+    --saving-color: #ff9500;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    overscroll-behavior-y: none;
+    font-size: 16px;
+}
+
+/* ヘッダー */
+.app-header {
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.header-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.header-btn.hidden {
+    visibility: hidden;
+}
+
+h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+}
+
+/* 画面切り替え */
+.screen {
+    display: none;
+    padding: 16px;
+    padding-bottom: 80px;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* 百貨店ボタン */
+.department-btn {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.department-btn:active {
+    background: #e5e5ea;
+}
+
+.dep-progress {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* フィルタバー */
+.filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.filter-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+/* 店舗カード */
+.store-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid var(--border-color);
+    transition: border-color 0.3s ease;
+}
+
+.store-card[data-status="saving"] { border-left-color: var(--saving-color); }
+.store-card[data-status="completed"] { border-left-color: var(--success-color); }
+.store-card[data-status="error"] { border-left-color: var(--error-color); }
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.brand-name {
+    font-size: 20px;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.status-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    background: #e5e5ea;
+    color: var(--text-secondary);
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.store-card[data-status="saving"] .status-badge { background: var(--saving-color); color: #fff; }
+.store-card[data-status="completed"] .status-badge { background: var(--success-color); color: #fff; }
+.store-card[data-status="error"] .status-badge { background: var(--error-color); color: #fff; }
+
+.input-group {
+    margin-bottom: 16px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+/* チップ (セグメント) */
+.chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #f2f2f7;
+    border: 1px solid transparent;
+    color: var(--text-primary);
+    font-size: 15px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.chip.selected {
+    background: #e0f0ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* 横並びボタン (弁当販売) */
+.radio-btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.radio-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f2f2f7;
+    border: 1px solid transparent;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.radio-btn.selected {
+    background: #e0f0ff;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* 入力欄 (価格・商品種類数) */
+.input-wrapper {
+    flex: 1;
+}
+
+input[type="number"] {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: #f2f2f7;
+    color: var(--text-primary);
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: #fff;
+}
+
+.price-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.separator {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.error-msg {
+    color: var(--error-color);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* モーダル */
+.modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+}
+
+.modal-content h2 { margin-bottom: 12px; }
+.modal-content p { font-size: 14px; color: var(--text-secondary); margin-bottom: 16px; }
+
+#api-url-input {
+    width: 100%;
+    height: 100px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-family: monospace;
+}
+
+.primary-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.secondary-btn {
+    width: 100%;
+    padding: 14px;
+    background: #e5e5ea;
+    color: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* ロード表示 */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}

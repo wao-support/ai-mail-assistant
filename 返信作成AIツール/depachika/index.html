@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>デパ地下調査アプリ</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="app-header">
+        <button id="back-btn" class="header-btn hidden">◀ 戻る</button>
+        <h1 id="header-title">百貨店一覧</h1>
+        <button id="settings-btn" class="header-btn">⚙️</button>
+    </header>
+
+    <!-- 画面1: 百貨店選択画面 -->
+    <main id="department-screen" class="screen active">
+        <div id="loading-overlay" class="loading">読込中...</div>
+        <div id="department-list" class="list-container">
+            <!-- JSで動的生成 -->
+        </div>
+    </main>
+
+    <!-- 画面2: 店舗名入力画面 -->
+    <main id="store-screen" class="screen">
+        <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">すべて</button>
+            <button class="filter-btn" data-filter="pending">未入力</button>
+            <button class="filter-btn" data-filter="completed">保存済み</button>
+        </div>
+        <div id="store-list" class="list-container">
+            <!-- JSで動的生成 -->
+        </div>
+    </main>
+    
+    <!-- 設定モーダル -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>初期設定</h2>
+            <p>GASでデプロイしたWebアプリURLを設定してください。</p>
+            <textarea id="api-url-input" placeholder="https://script.google.com/macros/s/.../exec"></textarea>
+            <button id="save-settings-btn" class="primary-btn">設定を保存して更新</button>
+            <button id="close-settings-btn" class="secondary-btn">キャンセル</button>
+        </div>
+    </div>
+
+    <!-- テンプレート: 百貨店ボタン -->
+    <template id="tpl-department">
+        <button class="department-btn">
+            <span class="dep-name"></span>
+            <span class="dep-progress"></span>
+        </button>
+    </template>
+
+    <!-- テンプレート: 店舗カード -->
+    <template id="tpl-store-card">
+        <div class="store-card">
+            <div class="card-header">
+                <h3 class="brand-name"></h3>
+                <span class="status-badge">未入力</span>
+            </div>
+            
+            <div class="input-group">
+                <label>セグメント</label>
+                <div class="chip-group" data-field="segment">
+                    <button class="chip" data-val="弁当">弁当</button>
+                    <button class="chip" data-val="サンドイッチ">サンドイッチ</button>
+                    <button class="chip" data-val="パン屋">パン屋</button>
+                    <button class="chip" data-val="生鮮食品">生鮮食品</button>
+                    <button class="chip" data-val="おにぎり">おにぎり</button>
+                    <button class="chip" data-val="鮨">鮨</button>
+                    <button class="chip" data-val="総菜">総菜</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>弁当販売</label>
+                <div class="radio-btn-group" data-field="has_bento">
+                    <button class="radio-btn" data-val="あり">あり</button>
+                    <button class="radio-btn" data-val="なし">なし</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>価格レンジ</label>
+                <div class="price-inputs">
+                    <div class="input-wrapper">
+                        <input type="number" inputmode="decimal" class="price-input" data-field="price_min" placeholder="下限">
+                    </div>
+                    <span class="separator">~</span>
+                    <div class="input-wrapper">
+                        <input type="number" inputmode="decimal" class="price-input" data-field="price_max" placeholder="上限">
+                    </div>
+                </div>
+                <div class="error-msg price-error hidden">下限 > 上限は設定できません</div>
+            </div>
+
+            <div class="input-group">
+                <label>商品種類数</label>
+                <div class="input-wrapper">
+                    <input type="number" inputmode="decimal" class="count-input" data-field="item_count" placeholder="0">
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+</html>
