@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsModal = document.getElementById('settingsModal');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
     const staffNameInput = document.getElementById('staffName');
 
@@ -39,20 +38,15 @@ https://www.wao-cart.com/
 Email: [メールアドレス]
 --------------------------------`;
 
-    // Config
+    // GAS Proxy URL (manages Gemini API key server-side)
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec';
+
     let config = {
-        apiKey: localStorage.getItem('geminiApiKey') || '',
-        model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultSignature,
-        gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
         staffName: localStorage.getItem('staffName') || ''
     };
 
     // Initialize
-    if (!config.apiKey) {
-        openSettings();
-    }
-    apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
     staffNameInput.value = config.staffName;
 
@@ -62,9 +56,6 @@ Email: [メールアドレス]
     }
 
     function closeSettings() {
-        if (!config.apiKey) {
-            showToast('APIキーが設定されていません。機能が制限されます。');
-        }
         settingsModal.classList.add('hidden');
     }
 
@@ -72,22 +63,15 @@ Email: [メールアドレス]
     closeSettingsBtn.addEventListener('click', closeSettings);
 
     saveSettingsBtn.addEventListener('click', () => {
-        const val = apiKeyInput.value.trim();
         const sig = signatureTextInput.value.trim();
-        if (val) {
-            config.apiKey = val;
-            config.signature = sig || defaultSignature;
-            config.staffName = staffNameInput.value.trim();
+        config.signature = sig || defaultSignature;
+        config.staffName = staffNameInput.value.trim();
 
-            localStorage.setItem('geminiApiKey', val);
-            localStorage.setItem('geminiSignature', config.signature);
-            localStorage.setItem('staffName', config.staffName);
+        localStorage.setItem('geminiSignature', config.signature);
+        localStorage.setItem('staffName', config.staffName);
 
-            showToast('設定を保存しました');
-            closeSettings();
-        } else {
-            alert('APIキーを入力してください');
-        }
+        showToast('設定を保存しました');
+        closeSettings();
     });
 
     // --- Utility: Toast ---
@@ -100,122 +84,31 @@ Email: [メールアドレス]
         }, duration);
     }
 
-    // --- AI Integration (Gemini API) ---
-    async function callGeminiApi(prompt, systemInstruction = null) {
-        if (!config.apiKey) {
-            throw new Error('APIキーが設定されていません。右上の設定アイコンから設定してください。');
-        }
-
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
-
-        const requestBody = {
-            contents: [{
-                parts: [{ text: prompt }]
-            }],
-            generationConfig: {
-                temperature: 0.2 // Lower temp for more consistent results fitting strict requirements
-            }
-        };
-
+    // --- AI Integration (via GAS Proxy) ---
+    async function callGeminiViaGas(prompt, temperature = 0.2, systemInstruction = null) {
+        const params = new URLSearchParams({
+            action: 'gemini',
+            prompt: prompt,
+            temperature: temperature.toString()
+        });
         if (systemInstruction) {
-            requestBody.systemInstruction = {
-                parts: [{ text: systemInstruction }]
-            };
+            params.append('systemInstruction', systemInstruction);
         }
 
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            body: params
+        });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                console.error("API Error details:", data);
-                throw new Error(data.error?.message || 'APIリクエストに失敗しました');
-            }
-
-            if (data.candidates && data.candidates[0].content.parts[0].text) {
-                return data.candidates[0].content.parts[0].text;
-            } else {
-                throw new Error('予期せぬレスポンス形式です');
-            }
-        } catch (error) {
-            console.error('Gemini API Error:', error);
-            throw error;
+        const data = await response.json();
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'GASプロキシエラー');
         }
-    }
-
-    // --- AI Integration (Gemini API: Streaming) ---
-    async function streamGeminiApi(prompt, onToken, systemInstruction = null) {
-        if (!config.apiKey) {
-            throw new Error('APIキーが設定されていません。右上の設定アイコンから設定してください。');
-        }
-
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
-
-        const requestBody = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2 }
-        };
-
-        if (systemInstruction) {
-            requestBody.systemInstruction = { parts: [{ text: systemInstruction }] };
-        }
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error?.message || 'APIリクエストに失敗しました');
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let buffer = "";
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop(); // keep incomplete line in buffer
-
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        const dataStr = line.replace("data: ", "").trim();
-                        if (!dataStr) continue;
-                        try {
-                            const data = JSON.parse(dataStr);
-                            const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                            if (textPart) {
-                                onToken(textPart);
-                            }
-                        } catch (e) {
-                            console.error("SSE parse error", e, dataStr);
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Gemini API Streaming Error:', error);
-            throw error;
-        }
+        return data.text;
     }
 
     // --- Usage Logging ---
     async function logUsage(logData) {
-        if (!config.gasUrl) return;
         try {
             const payload = JSON.stringify({
                 timestamp: new Date().toLocaleString('ja-JP'),
@@ -223,7 +116,7 @@ Email: [メールアドレス]
                 ...logData
             });
             const params = new URLSearchParams({ data: payload });
-            await fetch(config.gasUrl, {
+            await fetch(GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 body: params
@@ -237,18 +130,15 @@ Email: [メールアドレス]
     function preprocessEmailBody(text) {
         if (!text) return "";
 
-        // 簡易マスキング (Privacy Masking)
         let processed = text;
         // Email
         processed = processed.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL]');
         // Phone (Japanese common formats)
         processed = processed.replace(/0\d{1,4}-\d{1,4}-\d{4}/g, '[TEL]');
         processed = processed.replace(/0[789]0\d{8}/g, '[TEL]');
-        // 簡易的な口座番号・クレカっぽい連続数字
+        // Card numbers
         processed = processed.replace(/\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g, '[NUMBER]');
 
-        // 引用符(>)が連続する部分はカットまたは省略するなどの処理が可能だが、
-        // 現時点ではマスキングのみ実施
         return processed;
     }
 
@@ -302,17 +192,13 @@ Email: [メールアドレス]
 ### 受信メール
 ## ${processedEmail}`;
 
-        const resultText = await callGeminiApi(prompt);
+        const resultText = await callGeminiViaGas(prompt, 0.2);
 
-        // Parse JSON
         try {
-            // Remove markdown code blocks if AI included them despite instructions
             const cleanText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
             const result = JSON.parse(cleanText);
 
-            // Set UI
             if (result.category) {
-                // select option
                 const optionExists = Array.from(categorySelect.options).some(opt => opt.value === result.category);
                 if (optionExists) {
                     categorySelect.value = result.category;
@@ -321,7 +207,6 @@ Email: [メールアドレス]
                 }
             }
 
-            // Save result for the final output display
             window.latestCategorizationResult = result;
 
         } catch (e) {
@@ -347,7 +232,6 @@ Email: [メールアドレス]
         const tone = toneSelect.value;
         const additional = additionalInstructionInput.value.trim();
 
-        // Show loading
         emptyState.classList.add('hidden');
         resultContent.classList.add('hidden');
         loadingOverlay.classList.remove('hidden');
@@ -356,17 +240,15 @@ Email: [メールアドレス]
 
         try {
             const processedEmail = preprocessEmailBody(rawEmail);
+            const resultText = await runGeneration(processedEmail, category, tone, additional);
 
-            // Display categorization info early so user sees context immediately
+            // Show categorization info
             if (window.latestCategorizationResult) {
                 resCategory.textContent = window.latestCategorizationResult.category;
-
                 resConfidence.className = 'confidence-badge ' + window.latestCategorizationResult.confidence;
-
                 let confJp = "高";
                 if (window.latestCategorizationResult.confidence === "medium") confJp = "中";
                 if (window.latestCategorizationResult.confidence === "low") confJp = "低";
-
                 resConfidence.textContent = `確信度: ${confJp}`;
                 resReason.textContent = window.latestCategorizationResult.reason;
             } else {
@@ -375,29 +257,37 @@ Email: [メールアドレス]
                 resReason.textContent = '手動選択または判定情報なし';
             }
 
-            // Hide loading early, show result container so we can stream into it
+            // Parse and display result
+            let subject = "返信の件名（生成に失敗しました）";
+            let body = resultText;
+
+            const subjectMatch = resultText.match(/件名案[：:]\s*(.*?)\n/);
+            if (subjectMatch) subject = subjectMatch[1].trim();
+
+            const bodyMatch = resultText.split(/本文[：:]\s*\n?/);
+            if (bodyMatch.length > 1) {
+                body = bodyMatch.slice(1).join("本文：").trim();
+            } else {
+                body = resultText.replace(/件名案[：:].*?\n/, '').trim();
+            }
+
+            resSubject.textContent = subject;
+            resBody.textContent = body;
+
             loadingOverlay.classList.add('hidden');
             resultContent.classList.remove('hidden');
 
-            resSubject.textContent = "考え中...";
-            resBody.textContent = "";
-
-            await runGeneration(processedEmail, category, tone, additional);
-
-            // Send Usage Log
             logUsage({
                 feature: '返信作成',
                 category: category,
                 tone: tone,
                 inputContent: processedEmail,
                 additionalInstruction: additional,
-                generatedSubject: resSubject.textContent,
-                generatedBody: resBody.textContent
+                generatedSubject: subject,
+                generatedBody: body
             });
 
             showToast('返信文を生成しました');
-
-            // Scroll to top
             document.querySelector('.output-panel .panel-body').scrollTop = 0;
 
         } catch (error) {
@@ -448,57 +338,7 @@ ${additionalInstruction || '特になし'}
 ### 受信メール
 ## ${emailBody}`;
 
-        let resultBuffer = "";
-
-        await streamGeminiApi(prompt, (text) => {
-            resultBuffer += text;
-
-            // Try separating subject and body in real-time
-            const bodySplit = resultBuffer.split(/本文[：:]\s*\n?/);
-            if (bodySplit.length > 1) {
-                // Body has started
-                const subjectPart = bodySplit[0];
-                const subjectMatch = subjectPart.match(/件名案[：:]\s*([^\n]*)/);
-                if (subjectMatch) {
-                    resSubject.textContent = subjectMatch[1].trim();
-                } else {
-                    resSubject.textContent = subjectPart.replace(/件名案[：:].*?\n/, '').trim();
-                }
-                resBody.textContent = bodySplit.slice(1).join("本文：").trimStart();
-
-                // Auto-scroll to bottom of output panel while streaming
-                const panelBody = document.querySelector('.output-panel .panel-body');
-                panelBody.scrollTop = panelBody.scrollHeight;
-            } else {
-                // Still generating subject or formatting
-                const subjectMatch = resultBuffer.match(/件名案[：:]\s*([^\n]*)/);
-                if (subjectMatch) {
-                    resSubject.textContent = subjectMatch[1].trim();
-                } else {
-                    resSubject.textContent = "考え中...";
-                }
-                resBody.textContent = resultBuffer;
-            }
-        });
-
-        // Final parsing cleanly just in case formatting got scrambled
-        let subject = "返信の件名（生成に失敗しました）";
-        let body = resultBuffer;
-
-        const subjectMatch = resultBuffer.match(/件名案[：:]\s*(.*?)\n/);
-        if (subjectMatch) {
-            subject = subjectMatch[1].trim();
-        }
-
-        const bodyMatch = resultBuffer.split(/本文[：:]\s*\n?/);
-        if (bodyMatch.length > 1) {
-            body = bodyMatch.slice(1).join("本文：").trim();
-        } else {
-            body = resultBuffer.replace(/件名案[：:].*?\n/, '').trim();
-        }
-
-        resSubject.textContent = subject;
-        resBody.textContent = body;
+        return await callGeminiViaGas(prompt, 0.2);
     }
 
     // --- Copy Function ---
@@ -509,7 +349,6 @@ ${additionalInstruction || '特になし'}
         try {
             await navigator.clipboard.writeText(txt);
 
-            // Visual feedback
             const originalHTML = copyBtn.innerHTML;
             copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> コピー完了';
             copyBtn.classList.add('copied');
@@ -529,7 +368,7 @@ ${additionalInstruction || '特になし'}
     // UX Enhancements
     let hasCategorized = false;
     emailBodyInput.addEventListener('change', () => {
-        if (!hasCategorized && emailBodyInput.value.length > 10 && config.apiKey) {
+        if (!hasCategorized && emailBodyInput.value.length > 10) {
             hasCategorized = true;
             autoCategorizeBtn.click();
         }

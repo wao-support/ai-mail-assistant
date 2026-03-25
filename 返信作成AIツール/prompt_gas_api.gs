@@ -117,8 +117,69 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Gemini APIプロキシ（スクリプトプロパティにGEMINI_API_KEYを設定すること）
+function callGeminiProxy(e) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const apiKey = props.getProperty('GEMINI_API_KEY');
+
+    if (!apiKey) {
+      return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'GASのスクリプトプロパティにGEMINI_API_KEYを設定してください。' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const prompt = e.parameter.prompt || '';
+    const temperature = parseFloat(e.parameter.temperature || '0.2');
+    const systemInstruction = e.parameter.systemInstruction || '';
+
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey;
+
+    const requestBody = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: temperature }
+    };
+
+    if (systemInstruction) {
+      requestBody.systemInstruction = { parts: [{ text: systemInstruction }] };
+    }
+
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(requestBody),
+      muteHttpExceptions: true
+    });
+
+    const resCode = res.getResponseCode();
+    const resData = JSON.parse(res.getContentText());
+
+    if (resCode !== 200) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: resData.error && resData.error.message ? resData.error.message : 'Gemini APIエラー (HTTP ' + resCode + ')'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const text = resData.candidates && resData.candidates[0] && resData.candidates[0].content.parts[0].text
+      ? resData.candidates[0].content.parts[0].text
+      : '';
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', text: text }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // アプリケーション（JS）から新しいプロンプトを保存するときに呼ばれる（POSTリクエスト）
 function doPost(e) {
+  // Gemini APIプロキシ
+  if (e.parameter.action === 'gemini') {
+    return callGeminiProxy(e);
+  }
+
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(SHEET_NAME);

@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('settingsBtn');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
     const staffNameInput = document.getElementById('staffName');
 
@@ -37,9 +36,20 @@ https://obentodeli.jp/
 Email: support@obentodeli.jp
 --------------------------------`;
 
+    // GAS Proxy URL (manages Gemini API key server-side)
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec';
+
+    let config = {
+        signature: localStorage.getItem('geminiSignature') || defaultCsSignature,
+        staffName: localStorage.getItem('staffName') || ''
+    };
+
+    // Initialize
+    signatureTextInput.value = config.signature;
+    staffNameInput.value = config.staffName;
+
     // FAQ Data Cache
     let cachedFaqText = "";
-
     async function getFaqData() {
         if (cachedFaqText) return cachedFaqText;
         try {
@@ -57,7 +67,6 @@ Email: support@obentodeli.jp
 
     // Past Log Data Cache
     let cachedPastLogText = "";
-
     async function getPastLogData() {
         if (cachedPastLogText) return cachedPastLogText;
         try {
@@ -73,24 +82,6 @@ Email: support@obentodeli.jp
         return cachedPastLogText;
     }
 
-
-    // Config
-    let config = {
-        apiKey: localStorage.getItem('geminiApiKey') || '',
-        model: 'gemini-2.5-flash',
-        signature: localStorage.getItem('geminiSignature') || defaultCsSignature,
-        gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
-        staffName: localStorage.getItem('staffName') || ''
-    };
-
-    // Initialize
-    if (!config.apiKey) {
-        openSettings();
-    }
-    apiKeyInput.value = config.apiKey;
-    signatureTextInput.value = config.signature;
-    staffNameInput.value = config.staffName;
-
     // --- Settings Modal Logic ---
     function openSettings() { settingsModal.classList.remove('hidden'); }
     function closeSettings() { settingsModal.classList.add('hidden'); }
@@ -99,20 +90,13 @@ Email: support@obentodeli.jp
     settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettings(); });
 
     saveSettingsBtn.addEventListener('click', () => {
-        const val = apiKeyInput.value.trim();
         const sig = signatureTextInput.value.trim();
-        if (val) {
-            config.apiKey = val;
-            config.signature = sig || defaultCsSignature;
-            config.staffName = staffNameInput.value.trim();
-            localStorage.setItem('geminiApiKey', val);
-            localStorage.setItem('geminiSignature', config.signature);
-            localStorage.setItem('staffName', config.staffName);
-            showToast('設定を保存しました');
-            closeSettings();
-        } else {
-            alert('API Keyを入力してください');
-        }
+        config.signature = sig || defaultCsSignature;
+        config.staffName = staffNameInput.value.trim();
+        localStorage.setItem('geminiSignature', config.signature);
+        localStorage.setItem('staffName', config.staffName);
+        showToast('設定を保存しました');
+        closeSettings();
     });
 
     // --- Loading & Toast ---
@@ -121,9 +105,6 @@ Email: support@obentodeli.jp
         toast.textContent = message;
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 3000);
-    }
-    function hideLoading() {
-        loadingOverlay.classList.add('hidden');
     }
 
     // --- Preprocessing ---
@@ -135,83 +116,28 @@ Email: support@obentodeli.jp
         return pText;
     }
 
-    // --- Gemini API Call ---
-    async function callGeminiApi(prompt) {
-        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
-        const body = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3 }
-        };
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
+    // --- AI Integration (via GAS Proxy) ---
+    async function callGeminiViaGas(prompt, temperature = 0.3) {
+        const params = new URLSearchParams({
+            action: 'gemini',
+            prompt: prompt,
+            temperature: temperature.toString()
         });
 
-        if (!response.ok) {
-            const errBody = await response.text();
-            throw new Error(`API Error ${response.status}: ${errBody}`);
-        }
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            body: params
+        });
+
         const data = await response.json();
-        if (!data.candidates || data.candidates.length === 0) throw new Error("AIから回答が返ってきませんでした。");
-        return data.candidates[0].content.parts[0].text;
-    }
-
-    // --- Gemini API Call (Streaming) ---
-    async function streamGeminiApi(prompt, onToken) {
-        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
-        const body = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3 }
-        };
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-            const errBody = await response.json();
-            throw new Error(errBody.error?.message || `API Error ${response.status}`);
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'GASプロキシエラー');
         }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop(); // keep incomplete line
-
-            for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                    const dataStr = line.replace("data: ", "").trim();
-                    if (!dataStr) continue;
-                    try {
-                        const data = JSON.parse(dataStr);
-                        const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (textPart) {
-                            onToken(textPart);
-                        }
-                    } catch (e) {
-                        console.error("SSE parse error", e, dataStr);
-                    }
-                }
-            }
-        }
+        return data.text;
     }
 
     // --- Usage Logging ---
     async function logUsage(logData) {
-        if (!config.gasUrl) return;
         try {
             const payload = JSON.stringify({
                 timestamp: new Date().toLocaleString('ja-JP'),
@@ -219,7 +145,7 @@ Email: support@obentodeli.jp
                 ...logData
             });
             const params = new URLSearchParams({ data: payload });
-            await fetch(config.gasUrl, {
+            await fetch(GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 body: params
@@ -239,11 +165,8 @@ Email: support@obentodeli.jp
 
         const companyName = companyNameInput.value.trim();
         const recipientName = recipientNameInput.value.trim();
-
-        // Get selected policy and details
         const selectedPolicyType = policySelect.value;
         const policyDetail = policyDetailInput.value.trim();
-
         const tone = toneSelect.value;
         const useFaq = useFaqCheck.checked;
         const usePastLog = usePastLogCheck.checked;
@@ -261,7 +184,6 @@ Email: support@obentodeli.jp
             if (recipientName) recipientParts.push(recipientName);
             const recipientHeader = recipientParts.join("\\n");
 
-            // Build Prompt
             let prompt = `あなたは「お弁当デリ」のカスタマーサポート担当者です。
 お客様からの受信メールの内容を分析し、**自動で問い合わせのカテゴリを判定**した上で、適切なカスタマーサポートの返信メールを作成してください。
 
@@ -292,8 +214,8 @@ ${recipientHeader ? recipientHeader : "（入力された宛名なし。一般�
             prompt += `
 ### 出力フォーマット（厳守）
 【判定カテゴリ】: （※「注文・変更・キャンセル」「配送・遅延・未着」「商品不良・異物混入」「請求・領収書・支払い」「その他」の中から1つ選んで出力）
-【件名案】: 
-【本文】: 
+【件名案】:
+【本文】:
 
 ### 署名（必ず末尾に追加）
 ${config.signature}
@@ -311,90 +233,47 @@ ${config.signature}
 
             prompt += `\n### お客様からの受信メール\n## ${processedEmail}`;
 
-            // Provide immediate UI feedback for streaming
-            loadingOverlay.classList.add('hidden');
-            resultContent.classList.remove('hidden');
-            resSubjectEl.textContent = "考え中...";
-            resBodyEl.innerHTML = "";
+            const resultText = await callGeminiViaGas(prompt, 0.3);
 
-            // Wait, for obento_cs.js we need Category, Subject and Body.
-            // Since it streams, we can display Category and Policy info immediately via a placeholder.
-            let policyText = "-";
-            if (selectedPolicyType) policyText = selectedPolicyType;
-            if (policyDetail) policyText += ` (${policyDetail})`;
-            resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>（生成中...）</strong>`;
-            resFaqUsedEl.textContent = useFaq ? "使用した" : "使用していない";
-            resLogUsedEl.textContent = usePastLog ? "使用した" : "使用していない";
-
-            // Call Streaming API
-            let resultBuffer = "";
-            let finalCategory = "その他（自動判定失敗）";
-
-            await streamGeminiApi(prompt, (text) => {
-                resultBuffer += text;
-
-                // Extract Category dynamically while streaming
-                const categoryMatch = resultBuffer.match(/【判定カテゴリ】[：:]\s*([^\n]*)/);
-                if (categoryMatch) {
-                    finalCategory = categoryMatch[1].trim();
-                }
-                resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>${finalCategory || '（生成中...）'}</strong>`;
-
-                // Extract Subject dynamically while streaming
-                const subjectMatch = resultBuffer.match(/【件名案】[：:]\s*([^\n]*)/);
-                if (subjectMatch) {
-                    resSubjectEl.textContent = subjectMatch[1].trim();
-                }
-
-                // Extract Body dynamically while streaming
-                const bodySplit = resultBuffer.split(/【本文】[：:]\s*\n?/);
-                if (bodySplit.length > 1) {
-                    const bodyContent = bodySplit.slice(1).join("【本文】：").trimStart();
-                    resBodyEl.innerHTML = formatBodyText(bodyContent);
-                } else {
-                    // Until body formally starts, we can optionally show everything for debugging,
-                    // but since CS has category tags, we'll just show the buffer directly for now.
-                    resBodyEl.innerHTML = formatBodyText(resultBuffer);
-                }
-
-                // Keep scrolled to bottom
-                const panelBody = document.querySelector('.output-panel .panel-body');
-                panelBody.scrollTop = panelBody.scrollHeight;
-            });
-
-            // Final safety parsing
-            let category = finalCategory;
+            // Parse result
+            let category = "その他";
             let subject = "Re: お問い合わせにつきまして";
-            let body = resultBuffer;
+            let body = resultText;
 
-            const categoryMatch = resultText.match(/【判定カテゴリ】[：:]\s*(.*?)\n/);
+            const categoryMatch = resultText.match(/【判定カテゴリ】[：:]\s*(.*?)(?:\n|$)/);
             if (categoryMatch) category = categoryMatch[1].trim();
 
-            const subjectMatch = resultText.match(/【件名案】[：:]\s*(.*?)\n/);
+            const subjectMatch = resultText.match(/【件名案】[：:]\s*(.*?)(?:\n|$)/);
             if (subjectMatch) subject = subjectMatch[1].trim();
 
-            let bodySplitFinal = resultBuffer.split(/【本文】[：:]\s*\n?/);
-            if (bodySplitFinal.length > 1) {
-                body = bodySplitFinal.slice(1).join("【本文】：").trim();
+            const bodySplit = resultText.split(/【本文】[：:]\s*\n?/);
+            if (bodySplit.length > 1) {
+                body = bodySplit.slice(1).join("【本文】：").trim();
             } else {
-                body = resultBuffer.replace(/【判定カテゴリ】.*?\n/g, '').replace(/【件名案】.*?\n/g, '').trim();
+                body = resultText.replace(/【判定カテゴリ】.*?\n/g, '').replace(/【件名案】.*?\n/g, '').trim();
             }
 
             // Set UI
             resSubjectEl.textContent = subject;
             resBodyEl.innerHTML = formatBodyText(body);
 
-            // Set Info display final state with actual category
+            let policyText = "-";
+            if (selectedPolicyType) policyText = selectedPolicyType;
+            if (policyDetail) policyText += ` (${policyDetail})`;
             resPolicyEl.innerHTML = `${policyText}<br>- 判定カテゴリ: <strong>${category}</strong>`;
+            resFaqUsedEl.textContent = useFaq ? "使用した" : "使用していない";
+            resLogUsedEl.textContent = usePastLog ? "使用した" : "使用していない";
 
-            // Send Usage Log
+            loadingOverlay.classList.add('hidden');
+            resultContent.classList.remove('hidden');
+
             logUsage({
                 feature: 'CS返信（お弁当デリ）',
                 category: category,
                 tone: tone,
                 inputContent: processedEmail,
                 additionalInstruction: [selectedPolicyType, policyDetail].filter(Boolean).join(' / '),
-                generatedSubject: resSubjectEl.textContent,
+                generatedSubject: subject,
                 generatedBody: resBodyEl.innerText
             });
 
