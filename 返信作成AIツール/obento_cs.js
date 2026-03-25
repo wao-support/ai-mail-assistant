@@ -124,10 +124,7 @@ Email: support@obentodeli.jp
             temperature: temperature.toString()
         });
 
-        const response = await fetch(GAS_URL, {
-            method: 'POST',
-            body: params
-        });
+        const response = await fetch(`${GAS_URL}?${params.toString()}`);
 
         const data = await response.json();
         if (data.status !== 'success') {

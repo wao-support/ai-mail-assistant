@@ -68,6 +68,11 @@ function migrateSheetIfNeeded(sheet) {
 
 // アプリケーション（JS）からデータを読み込むときに呼ばれる（GETリクエスト）
 function doGet(e) {
+  // Gemini APIプロキシ（GETパラメータ経由）
+  if (e.parameter.action === 'gemini') {
+    return callGeminiProxy(e);
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAME);
   
