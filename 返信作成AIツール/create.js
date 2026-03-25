@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsModal = document.getElementById('settingsModal');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const proxyTokenInput = document.getElementById('proxyToken');
+    const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
     const staffNameInput = document.getElementById('staffName');
 
@@ -37,7 +37,7 @@ Email: [メールアドレス]
 
     // Config (Shared with app.js via localStorage)
     let config = {
-        proxyToken: localStorage.getItem('proxyToken') || '',
+        apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultSignature,
         gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
@@ -45,10 +45,10 @@ Email: [メールアドレス]
     };
 
     // Initialize
-    if (!config.proxyToken) {
+    if (!config.apiKey) {
         openSettings();
     }
-    proxyTokenInput.value = config.proxyToken;
+    apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
     staffNameInput.value = config.staffName;
 
@@ -58,8 +58,8 @@ Email: [メールアドレス]
     }
 
     function closeSettings() {
-        if (!config.proxyToken) {
-            showToast('アクセストークンが設定されていません。機能が制限されます。');
+        if (!config.apiKey) {
+            showToast('APIキーが設定されていません。機能が制限されます。');
         }
         settingsModal.classList.add('hidden');
     }
@@ -68,21 +68,21 @@ Email: [メールアドレス]
     closeSettingsBtn.addEventListener('click', closeSettings);
 
     saveSettingsBtn.addEventListener('click', () => {
-        const token = proxyTokenInput.value.trim();
+        const val = apiKeyInput.value.trim();
         const sig = signatureTextInput.value.trim();
-        if (token) {
-            config.proxyToken = token;
+        if (val) {
+            config.apiKey = val;
             config.signature = sig || defaultSignature;
             config.staffName = staffNameInput.value.trim();
 
-            localStorage.setItem('proxyToken', token);
+            localStorage.setItem('geminiApiKey', val);
             localStorage.setItem('geminiSignature', config.signature);
             localStorage.setItem('staffName', config.staffName);
 
             showToast('設定を保存しました');
             closeSettings();
         } else {
-            alert('アクセストークンを入力してください');
+            alert('APIキーを入力してください');
         }
     });
 
@@ -96,39 +96,107 @@ Email: [メールアドレス]
         }, duration);
     }
 
-    // --- AI Integration (GASプロキシ経由) ---
+    // --- AI Integration (Gemini API) ---
     async function callGeminiApi(prompt) {
-        if (!config.proxyToken) {
-            throw new Error('アクセストークンが設定されていません。右上の設定アイコンから設定してください。');
+        if (!config.apiKey) {
+            throw new Error('APIキーが設定されていません。右上の設定アイコンから設定してください。');
         }
 
-        const params = new URLSearchParams({
-            action: 'gemini',
-            token: config.proxyToken,
-            prompt: prompt,
-            temperature: '0.3'
-        });
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
 
-        const response = await fetch(config.gasUrl, {
-            method: 'POST',
-            body: params
-        });
+        const requestBody = {
+            contents: [{
+                parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+                temperature: 0.3 // Slightly higher than reply logic, as it's a creative task from scratch
+            }
+        };
 
-        if (!response.ok) {
-            throw new Error(`通信エラー: ${response.status}`);
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error("API Error details:", data);
+                throw new Error(data.error?.message || 'APIリクエストに失敗しました');
+            }
+
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                return data.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error('予期せぬレスポンス形式です');
+            }
+        } catch (error) {
+            console.error('Gemini API Error:', error);
+            throw error;
         }
-
-        const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'API呼び出しに失敗しました');
-        }
-        return data.text;
     }
 
-    // --- AI Integration (GASプロキシ経由・非ストリーミング) ---
+    // --- AI Integration (Gemini API: Streaming) ---
     async function streamGeminiApi(prompt, onToken) {
-        const text = await callGeminiApi(prompt);
-        onToken(text);
+        if (!config.apiKey) {
+            throw new Error('APIキーが設定されていません。右上の設定アイコンから設定してください。');
+        }
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+
+        const requestBody = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3 }
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error?.message || 'APIリクエストに失敗しました');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop(); // keep incomplete line
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const dataStr = line.replace("data: ", "").trim();
+                        if (!dataStr) continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (textPart) {
+                                onToken(textPart);
+                            }
+                        } catch (e) {
+                            console.error("SSE parse error", e, dataStr);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Gemini API Streaming Error:', error);
+            throw error;
+        }
     }
 
     // --- Usage Logging ---

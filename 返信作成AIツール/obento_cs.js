@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('settingsBtn');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const proxyTokenInput = document.getElementById('proxyToken');
+    const apiKeyInput = document.getElementById('apiKey');
     const signatureTextInput = document.getElementById('signatureText');
     const staffNameInput = document.getElementById('staffName');
 
@@ -76,7 +76,7 @@ Email: support@obentodeli.jp
 
     // Config
     let config = {
-        proxyToken: localStorage.getItem('proxyToken') || '',
+        apiKey: localStorage.getItem('geminiApiKey') || '',
         model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultCsSignature,
         gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
@@ -84,10 +84,10 @@ Email: support@obentodeli.jp
     };
 
     // Initialize
-    if (!config.proxyToken) {
+    if (!config.apiKey) {
         openSettings();
     }
-    proxyTokenInput.value = config.proxyToken;
+    apiKeyInput.value = config.apiKey;
     signatureTextInput.value = config.signature;
     staffNameInput.value = config.staffName;
 
@@ -99,19 +99,19 @@ Email: support@obentodeli.jp
     settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettings(); });
 
     saveSettingsBtn.addEventListener('click', () => {
-        const token = proxyTokenInput.value.trim();
+        const val = apiKeyInput.value.trim();
         const sig = signatureTextInput.value.trim();
-        if (token) {
-            config.proxyToken = token;
+        if (val) {
+            config.apiKey = val;
             config.signature = sig || defaultCsSignature;
             config.staffName = staffNameInput.value.trim();
-            localStorage.setItem('proxyToken', token);
+            localStorage.setItem('geminiApiKey', val);
             localStorage.setItem('geminiSignature', config.signature);
             localStorage.setItem('staffName', config.staffName);
             showToast('設定を保存しました');
             closeSettings();
         } else {
-            alert('アクセストークンを入力してください');
+            alert('API Keyを入力してください');
         }
     });
 
@@ -135,36 +135,78 @@ Email: support@obentodeli.jp
         return pText;
     }
 
-    // --- AI Integration (GASプロキシ経由) ---
+    // --- Gemini API Call ---
     async function callGeminiApi(prompt) {
-        if (!config.proxyToken) throw new Error("アクセストークンが設定されていません。右上の歯車アイコンから設定してください。");
+        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3 }
+        };
 
-        const params = new URLSearchParams({
-            action: 'gemini',
-            token: config.proxyToken,
-            prompt: prompt,
-            temperature: '0.3'
-        });
-
-        const response = await fetch(config.gasUrl, {
-            method: 'POST',
-            body: params
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
-            throw new Error(`通信エラー: ${response.status}`);
+            const errBody = await response.text();
+            throw new Error(`API Error ${response.status}: ${errBody}`);
         }
         const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'API呼び出しに失敗しました');
-        }
-        return data.text;
+        if (!data.candidates || data.candidates.length === 0) throw new Error("AIから回答が返ってきませんでした。");
+        return data.candidates[0].content.parts[0].text;
     }
 
-    // --- AI Integration (GASプロキシ経由・非ストリーミング) ---
+    // --- Gemini API Call (Streaming) ---
     async function streamGeminiApi(prompt, onToken) {
-        const text = await callGeminiApi(prompt);
-        onToken(text);
+        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3 }
+        };
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const errBody = await response.json();
+            throw new Error(errBody.error?.message || `API Error ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // keep incomplete line
+
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const dataStr = line.replace("data: ", "").trim();
+                    if (!dataStr) continue;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (textPart) {
+                            onToken(textPart);
+                        }
+                    } catch (e) {
+                        console.error("SSE parse error", e, dataStr);
+                    }
+                }
+            }
+        }
     }
 
     // --- Usage Logging ---
