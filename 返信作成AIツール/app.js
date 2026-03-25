@@ -38,8 +38,9 @@ https://www.wao-cart.com/
 Email: [メールアドレス]
 --------------------------------`;
 
-    // GAS Proxy URL (manages Gemini API key server-side)
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec';
+    // GAS URLs
+    const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbymHzOHxK6zxLVFi6_WijtJhySPk9KHOz6UEadpuOX7h5vYCsSu5kn-1vmsuUSN2b38/exec'; // プロンプト置き場（Geminiプロキシ）
+    const GAS_LOG_URL = 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec'; // ログ記録
 
     let config = {
         signature: localStorage.getItem('geminiSignature') || defaultSignature,
@@ -95,7 +96,7 @@ Email: [メールアドレス]
             params.append('systemInstruction', systemInstruction);
         }
 
-        const response = await fetch(`${GAS_URL}?${params.toString()}`);
+        const response = await fetch(`${GAS_PROXY_URL}?${params.toString()}`);
 
         const data = await response.json();
         if (data.status !== 'success') {
@@ -113,7 +114,7 @@ Email: [メールアドレス]
                 ...logData
             });
             const params = new URLSearchParams({ data: payload });
-            await fetch(GAS_URL, {
+            await fetch(GAS_LOG_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 body: params
