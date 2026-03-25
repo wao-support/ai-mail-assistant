@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('settingsBtn');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const apiKeyInput = document.getElementById('apiKey');
+    const proxyTokenInput = document.getElementById('proxyToken');
     const signatureTextInput = document.getElementById('signatureText');
     const staffNameInput = document.getElementById('staffName');
 
@@ -76,7 +76,7 @@ Email: support@obentodeli.jp
 
     // Config
     let config = {
-        apiKey: localStorage.getItem('geminiApiKey') || '',
+        proxyToken: localStorage.getItem('proxyToken') || '',
         model: 'gemini-2.5-flash',
         signature: localStorage.getItem('geminiSignature') || defaultCsSignature,
         gasUrl: localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbzLW95iIn44aujvazfOQGHbjivlHKyGzr0pdljOJmNclZ7C-w6Yeobb1GOwZ9BI6KieDQ/exec',
@@ -84,10 +84,10 @@ Email: support@obentodeli.jp
     };
 
     // Initialize
-    if (!config.apiKey) {
+    if (!config.proxyToken) {
         openSettings();
     }
-    apiKeyInput.value = config.apiKey;
+    proxyTokenInput.value = config.proxyToken;
     signatureTextInput.value = config.signature;
     staffNameInput.value = config.staffName;
 
@@ -99,19 +99,19 @@ Email: support@obentodeli.jp
     settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettings(); });
 
     saveSettingsBtn.addEventListener('click', () => {
-        const val = apiKeyInput.value.trim();
+        const token = proxyTokenInput.value.trim();
         const sig = signatureTextInput.value.trim();
-        if (val) {
-            config.apiKey = val;
+        if (token) {
+            config.proxyToken = token;
             config.signature = sig || defaultCsSignature;
             config.staffName = staffNameInput.value.trim();
-            localStorage.setItem('geminiApiKey', val);
+            localStorage.setItem('proxyToken', token);
             localStorage.setItem('geminiSignature', config.signature);
             localStorage.setItem('staffName', config.staffName);
             showToast('設定を保存しました');
             closeSettings();
         } else {
-            alert('API Keyを入力してください');
+            alert('アクセストークンを入力してください');
         }
     });
 
@@ -135,78 +135,36 @@ Email: support@obentodeli.jp
         return pText;
     }
 
-    // --- Gemini API Call ---
+    // --- AI Integration (GASプロキシ経由) ---
     async function callGeminiApi(prompt) {
-        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
-        const body = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3 }
-        };
+        if (!config.proxyToken) throw new Error("アクセストークンが設定されていません。右上の歯車アイコンから設定してください。");
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
+        const params = new URLSearchParams({
+            action: 'gemini',
+            token: config.proxyToken,
+            prompt: prompt,
+            temperature: '0.3'
+        });
+
+        const response = await fetch(config.gasUrl, {
+            method: 'POST',
+            body: params
         });
 
         if (!response.ok) {
-            const errBody = await response.text();
-            throw new Error(`API Error ${response.status}: ${errBody}`);
+            throw new Error(`通信エラー: ${response.status}`);
         }
         const data = await response.json();
-        if (!data.candidates || data.candidates.length === 0) throw new Error("AIから回答が返ってきませんでした。");
-        return data.candidates[0].content.parts[0].text;
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'API呼び出しに失敗しました');
+        }
+        return data.text;
     }
 
-    // --- Gemini API Call (Streaming) ---
+    // --- AI Integration (GASプロキシ経由・非ストリーミング) ---
     async function streamGeminiApi(prompt, onToken) {
-        if (!config.apiKey) throw new Error("APIキーが設定されていません。右上の歯車アイコンから設定してください。");
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
-        const body = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3 }
-        };
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-            const errBody = await response.json();
-            throw new Error(errBody.error?.message || `API Error ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop(); // keep incomplete line
-
-            for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                    const dataStr = line.replace("data: ", "").trim();
-                    if (!dataStr) continue;
-                    try {
-                        const data = JSON.parse(dataStr);
-                        const textPart = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (textPart) {
-                            onToken(textPart);
-                        }
-                    } catch (e) {
-                        console.error("SSE parse error", e, dataStr);
-                    }
-                }
-            }
-        }
+        const text = await callGeminiApi(prompt);
+        onToken(text);
     }
 
     // --- Usage Logging ---
